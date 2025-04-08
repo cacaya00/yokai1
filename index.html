@@ -116,6 +116,7 @@
       padding: 15px;
       border-radius: 6px;
       margin-top: 20px;
+      text-align: center;
     }
     .profit-positive {
       color: #28a745;
@@ -126,12 +127,13 @@
       font-weight: bold;
     }
     .profit-summary {
-      font-size: 18px;
+      font-size: 20px;
       margin-top: 10px;
-      padding: 10px;
+      padding: 15px;
       background-color: #e9f5ff;
       border-radius: 6px;
       text-align: center;
+      font-weight: bold;
     }
     .api-notice {
       font-size: 12px;
@@ -154,6 +156,7 @@
       margin-top: 10px;
       padding-top: 10px;
       font-weight: bold;
+      font-size: 18px;
     }
     .subtotal-row {
       margin-top: 10px;
@@ -206,6 +209,21 @@
       font-size: 14px;
       color: #777;
     }
+    .total-value-display {
+      font-size: 20px;
+      text-align: center;
+      font-weight: bold;
+      padding: 10px;
+      background-color: #e9f5ff;
+      border-radius: 6px;
+      margin-top: 15px;
+    }
+    .untradable-value {
+      color: #1f3050;
+    }
+    .total-sum-value {
+      color: var(--primary);
+    }
     @keyframes blink {
       50% { opacity: 0.5; }
     }
@@ -242,6 +260,9 @@
       <div class="reward-list" id="rewardList">
         <!-- 보상 항목들이 여기에 추가됩니다 -->
       </div>
+      <div id="totalValueDisplay" class="total-value-display">
+        <!-- 총 기대가치가 여기에 표시됩니다 -->
+      </div>
       <p class="data-source">* 200회 실행 데이터 기반 평균 계산</p>
     </div>
 
@@ -270,14 +291,15 @@
     const resultContainer = document.getElementById('resultContainer');
     const apiErrorEl = document.getElementById('apiError');
     const debugInfoEl = document.getElementById('debugInfo');
+    const totalValueDisplayEl = document.getElementById('totalValueDisplay');
     
     // 요괴 섬멸 보상 데이터 (200회 실행 결과 기반)
     const yokaiRewards = [
       { id: 'remnant', name: '요기의 잔흔', avgQuantity: 25.97, price: 5000, fixedPrice: true, tradable: false },
-      { id: 'remnant-tradable', name: '요기의 잔흔(1회 거래 가능)', avgQuantity: 3.125, price: 0, searchName: '요기의 잔흔(1회 거래 가능)', tradable: true },
+      { id: 'remnant-tradable', name: '요기의 잔흔(1회 교환 가능)', avgQuantity: 3.125, price: 0, searchName: '요기의 잔흔(1회 교환 가능)', tradable: true },
       { id: 'lion-core', name: '무결점 라이언 코어', avgQuantity: 20.68, price: 0, searchName: '무결점 라이언 코어', tradable: true },
       { id: 'harmony', name: '무결점 조화의 결정체', avgQuantity: 9.435, price: 0, searchName: '무결점 조화의 결정체', tradable: true },
-      { id: 'clue', name: '형상화된 요기의 단서', avgQuantity: 0.135, price: 0, searchName: '형상화된 요기의 단서', tradable: true },
+      { id: 'clue', name: '형상화된 요기의 단서', avgQuantity: 0.135, price: 0, searchName: '형상화된 요기의 단서', tradable: true, npcPrice: 90000 },
       { id: 'gold', name: '골드', avgQuantity: 207360.795, price: 1, fixedPrice: true, tradable: true }
     ];
     
@@ -358,121 +380,121 @@
       }, 500);
     }
 
-  // 모든 아이템 가격 가져오기
-  function fetchAllPrices() {
-    // 버튼 및 로딩 상태 표시
-    refreshBtn.disabled = true;
-    loadingContainer.classList.remove('hidden');
-    apiErrorEl.style.display = 'none';
-  
-    // 상태 표시 업데이트
-    updateItemStatus('loading');
-  
-    // API 호출이 필요한 아이템만 필터링 (거래 가능하고 검색 이름이 있는 아이템)
-    const itemsToFetch = yokaiRewards.filter(reward => reward.tradable && !reward.fixedPrice && reward.searchName);
-  
-    // 디버그 정보
-    if (DEBUG_MODE) {
-      debugInfoEl.innerHTML = `검색할 아이템: ${itemsToFetch.map(item => item.name).join(', ')}`;
-    }
-  
-    // 각 아이템에 대한 API 호출 생성
-    const fetchPromises = itemsToFetch.map(reward => {
-      const itemName = encodeURIComponent(reward.searchName);
-      // CORS 프록시 URL 추가
-      const corsProxy = 'https://cors-anywhere.herokuapp.com/';
-      const apiUrl = `${corsProxy}https://api.neople.co.kr/df/auction-sold?itemName=${itemName}&wordType=match&wordShort=true&limit=10&apikey=${API_KEY}`;
+    // 모든 아이템 가격 가져오기
+    function fetchAllPrices() {
+      // 버튼 및 로딩 상태 표시
+      refreshBtn.disabled = true;
+      loadingContainer.classList.remove('hidden');
+      apiErrorEl.style.display = 'none';
     
-      // 디버그 정보 추가
+      // 상태 표시 업데이트
+      updateItemStatus('loading');
+    
+      // API 호출이 필요한 아이템만 필터링 (거래 가능하고 검색 이름이 있는 아이템)
+      const itemsToFetch = yokaiRewards.filter(reward => reward.tradable && !reward.fixedPrice && reward.searchName);
+    
+      // 디버그 정보
       if (DEBUG_MODE) {
-        console.log(`${reward.name} 검색 URL: ${apiUrl}`);
-        debugInfoEl.innerHTML += `<br>${reward.name} API 호출 중...`;
+        debugInfoEl.innerHTML = `검색할 아이템: ${itemsToFetch.map(item => item.name).join(', ')}`;
       }
     
-      return fetch(apiUrl)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`API 응답 오류: ${response.status}`);
-          }
-          return response.json();
-        })
-        .then(data => {
-          // 디버그 정보
-          if (DEBUG_MODE) {
-            console.log(`${reward.name} 응답:`, data);
-          }
-          
-          // API 응답 데이터 처리
-          if (data && data.rows && data.rows.length > 0) {
-            // 최근 거래 가격의 평균 계산
-            const prices = data.rows.map(item => item.unitPrice);
-            const avgPrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
-          
-            reward.price = Math.floor(avgPrice);
-            reward.avgPrice = Math.floor(avgPrice);
-            reward.lastUpdate = new Date();
-            reward.status = 'success';
+      // 각 아이템에 대한 API 호출 생성
+      const fetchPromises = itemsToFetch.map(reward => {
+        const itemName = encodeURIComponent(reward.searchName);
+        // CORS 프록시 URL 추가
+        const corsProxy = 'https://cors-anywhere.herokuapp.com/';
+        const apiUrl = `${corsProxy}https://api.neople.co.kr/df/auction-sold?itemName=${itemName}&wordType=match&wordShort=true&limit=10&apikey=${API_KEY}`;
+      
+        // 디버그 정보 추가
+        if (DEBUG_MODE) {
+          console.log(`${reward.name} 검색 URL: ${apiUrl}`);
+          debugInfoEl.innerHTML += `<br>${reward.name} API 호출 중...`;
+        }
+      
+        return fetch(apiUrl)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`API 응답 오류: ${response.status}`);
+            }
+            return response.json();
+          })
+          .then(data => {
+            // 디버그 정보
+            if (DEBUG_MODE) {
+              console.log(`${reward.name} 응답:`, data);
+            }
+            
+            // API 응답 데이터 처리
+            if (data && data.rows && data.rows.length > 0) {
+              // 최근 거래 가격의 평균 계산
+              const prices = data.rows.map(item => item.unitPrice);
+              const avgPrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+            
+              reward.price = Math.floor(avgPrice);
+              reward.avgPrice = Math.floor(avgPrice);
+              reward.lastUpdate = new Date();
+              reward.status = 'success';
+            
+              // 디버그 정보
+              if (DEBUG_MODE) {
+                console.log(`${reward.name} 가격 설정: ${reward.price} 골드`);
+                debugInfoEl.innerHTML += `<br>${reward.name} 가격: ${reward.price} 골드 (성공)`;
+              }
+            } else {
+              throw new Error('데이터를 찾을 수 없습니다');
+            }
+          })
+          .catch(error => {
+            console.error(`${reward.name} 가격 로드 오류:`, error);
+            reward.status = 'error';
+            reward.errorMessage = error.message;
           
             // 디버그 정보
             if (DEBUG_MODE) {
-              console.log(`${reward.name} 가격 설정: ${reward.price} 골드`);
-              debugInfoEl.innerHTML += `<br>${reward.name} 가격: ${reward.price} 골드 (성공)`;
+              debugInfoEl.innerHTML += `<br>${reward.name} 오류: ${error.message}`;
             }
-          } else {
-            throw new Error('데이터를 찾을 수 없습니다');
-          }
-        })
-        .catch(error => {
-          console.error(`${reward.name} 가격 로드 오류:`, error);
-          reward.status = 'error';
-          reward.errorMessage = error.message;
-        
+            
+            // 테스트용 데이터 설정 (API 호출 실패 시)
+            if (reward.id === 'remnant-tradable') {
+              reward.price = 10500;
+            } else if (reward.id === 'lion-core') {
+              reward.price = 22000;
+            } else if (reward.id === 'harmony') {
+              reward.price = 32000;
+            } else if (reward.id === 'clue') {
+              reward.price = 550000;
+            }
+          });
+      });
+    
+      // 모든 API 호출 완료 후 처리
+      Promise.allSettled(fetchPromises)
+        .then(results => {
           // 디버그 정보
           if (DEBUG_MODE) {
-            debugInfoEl.innerHTML += `<br>${reward.name} 오류: ${error.message}`;
+            console.log('모든 API 호출 결과:', results);
+            debugInfoEl.innerHTML += '<br>모든 API 호출 완료';
           }
-          
-          // 테스트용 데이터 설정 (API 호출 실패 시)
-          if (reward.id === 'remnant-tradable') {
-            reward.price = 10500;
-          } else if (reward.id === 'lion-core') {
-            reward.price = 22000;
-          } else if (reward.id === 'harmony') {
-            reward.price = 32000;
-          } else if (reward.id === 'clue') {
-            reward.price = 550000;
+        
+          // UI 업데이트
+          updateMarketPricesUI();
+          displayRewardInfo();
+          calculateExpectedProfit();
+        })
+        .catch(error => {
+          console.error('API 오류:', error);
+          apiErrorEl.textContent = '경매장 정보를 가져오는데 실패했습니다. 잠시 후 다시 시도해주세요.';
+          apiErrorEl.style.display = 'block';
+        
+          if (DEBUG_MODE) {
+            debugInfoEl.innerHTML += `<br>전체 API 오류: ${error.message}`;
           }
+        })
+        .finally(() => {
+          refreshBtn.disabled = false;
+          loadingContainer.classList.add('hidden');
         });
-    });
-  
-    // 모든 API 호출 완료 후 처리
-    Promise.allSettled(fetchPromises)
-      .then(results => {
-        // 디버그 정보
-        if (DEBUG_MODE) {
-          console.log('모든 API 호출 결과:', results);
-          debugInfoEl.innerHTML += '<br>모든 API 호출 완료';
-        }
-      
-        // UI 업데이트
-        updateMarketPricesUI();
-        displayRewardInfo();
-        calculateExpectedProfit();
-      })
-      .catch(error => {
-        console.error('API 오류:', error);
-        apiErrorEl.textContent = '경매장 정보를 가져오는데 실패했습니다. 잠시 후 다시 시도해주세요.';
-        apiErrorEl.style.display = 'block';
-      
-        if (DEBUG_MODE) {
-          debugInfoEl.innerHTML += `<br>전체 API 오류: ${error.message}`;
-        }
-      })
-      .finally(() => {
-        refreshBtn.disabled = false;
-        loadingContainer.classList.add('hidden');
-      });
-  }
+    }
 
     // 모든 아이템의 상태 업데이트
     function updateItemStatus(status) {
@@ -498,6 +520,11 @@
           let priceText = '로딩 중...';
           if (reward.status === 'success') {
             priceText = `${formatNumber(reward.price)} 골드`;
+            
+            // NPC 가격 표시 (형상화된 요기의 단서)
+            if (reward.id === 'clue' && reward.npcPrice) {
+              priceText += ` (NPC: ${formatNumber(reward.npcPrice)} 골드)`;
+            }
           } else if (reward.status === 'error') {
             priceText = '가격 정보 없음';
           }
@@ -544,7 +571,7 @@
           <div>
             <span>${reward.name}</span>
             <span class="amount">(평균 ${reward.avgQuantity.toFixed(2)}개)</span>
-            ${!reward.tradable ? '<span class="untradable">(거래 불가)</span>' : ''}
+            ${!reward.tradable ? '<span class="untradable"></span>' : ''}
           </div>
           <div>${formatNumber(rewardValue)} 골드</div>
         `;
@@ -552,32 +579,8 @@
         rewardListEl.appendChild(rewardEl);
       });
       
-      // 거래 불가능 항목 소계
-      const untradableEl = document.createElement('div');
-      untradableEl.className = 'reward-item subtotal-row';
-      untradableEl.innerHTML = `
-        <div>거래 불가능 아이템 가치</div>
-        <div>${formatNumber(Math.floor(untradableValue))} 골드</div>
-      `;
-      rewardListEl.appendChild(untradableEl);
-      
-      // 거래 가능 항목 소계
-      const tradableEl = document.createElement('div');
-      tradableEl.className = 'reward-item subtotal-row';
-      tradableEl.innerHTML = `
-        <div>거래 가능 아이템 가치</div>
-        <div>${formatNumber(Math.floor(tradableValue))} 골드</div>
-      `;
-      rewardListEl.appendChild(tradableEl);
-      
-      // 총 가치 행 추가
-      const totalEl = document.createElement('div');
-      totalEl.className = 'reward-item total-row';
-      totalEl.innerHTML = `
-        <div>총 기대 가치</div>
-        <div>${formatNumber(Math.floor(totalValue))} 골드</div>
-      `;
-      rewardListEl.appendChild(totalEl);
+      // 총 가치 표시 (요청한 형식대로)
+      totalValueDisplayEl.innerHTML = `총 기대가치 <span class="untradable-value">(${formatNumber(Math.floor(untradableValue))})</span> <span class="total-sum-value">${formatNumber(Math.floor(totalValue))}</span> 골드`;
     }
 
     // 기대 수익 계산
@@ -604,25 +607,28 @@
       tradableValue = Math.floor(tradableValue);
       untradableValue = Math.floor(untradableValue);
       
-      // 형상화된 요기의 단서 가격 가져오기
+      // 형상화된 요기의 단서 가격 가져오기 (경매장 or NPC 가격)
       const clueItem = yokaiRewards.find(item => item.id === 'clue');
-      const cluePrice = clueItem ? clueItem.price : 0;
+      const clueMarketPrice = clueItem ? clueItem.price : 0;
+      const clueNpcPrice = clueItem && clueItem.npcPrice ? clueItem.npcPrice : 0;
       
-      // 순이익 계산 (거래 가능 아이템만 고려)
-      const netProfit = tradableValue - cluePrice;
-      const profitRatio = cluePrice > 0 ? (netProfit / cluePrice) * 100 : 0;
+      // 경매장 구매 시 순이익
+      const marketNetProfit = tradableValue - clueMarketPrice;
+      const marketProfitRatio = clueMarketPrice > 0 ? (marketNetProfit / clueMarketPrice) * 100 : 0;
       
-      // 결과 표시
+      // NPC 구매 시 순이익
+      const npcNetProfit = tradableValue - clueNpcPrice;
+      const npcProfitRatio = clueNpcPrice > 0 ? (npcNetProfit / clueNpcPrice) * 100 : 0;
+      
+      // 결과 표시 (간소화 및 중앙 정렬)
       resultContainer.innerHTML = `
-        <p>형상화된 요기의 단서 비용: <b>${formatNumber(cluePrice)} 골드</b></p>
-        <p>거래 가능 아이템 기대 수익: <b>${formatNumber(tradableValue)} 골드</b></p>
-        <p>거래 불가능 아이템 가치: <b>${formatNumber(untradableValue)} 골드</b> (약 ${Math.floor(untradableValue / 10000)}만 골드)</p>
-        <p>총 기대 가치: <b>${formatNumber(totalExpectedValue)} 골드</b></p>
-        <p>예상 순이익(거래 가능 기준): <span class="${netProfit >= 0 ? 'profit-positive' : 'profit-negative'}">${formatNumber(netProfit)} 골드</span></p>
+        <p>형상화된 요기의 단서 경매장 구매 비용: <b>${formatNumber(clueMarketPrice)} 골드</b></p>
+        <p>형상화된 요기의 단서 NPC 판매 비용: <b>${formatNumber(clueNpcPrice)} 골드</b></p>
+        <p>요괴 섬멸 컨텐츠 평균 획득량: <b>${clueItem.avgQuantity.toFixed(3)}개</b></p>
         
         <div class="profit-summary">
-          <p>수익률: <span class="${profitRatio >= 0 ? 'profit-positive' : 'profit-negative'}">${profitRatio.toFixed(2)}%</span></p>
-          <p>${netProfit >= 0 ? '✅ 수익이 발생할 것으로 예상됩니다!' : '❌ 손해가 발생할 수 있습니다!'}</p>
+          <p>경매장 구매 시 결과: <span class="${marketNetProfit >= 0 ? 'profit-positive' : 'profit-negative'}">${formatNumber(marketNetProfit)} 골드</span></p>
+          <p>NPC 구매 시 결과: <span class="${npcNetProfit >= 0 ? 'profit-positive' : 'profit-negative'}">${formatNumber(npcNetProfit)} 골드</span></p>
         </div>
       `;
     }
