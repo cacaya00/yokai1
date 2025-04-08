@@ -34,7 +34,6 @@
       padding: 20px;
     }
     header {
-      /* 중앙 정렬 제거 */
       margin-bottom: 30px;
     }
     header h1 {
@@ -113,13 +112,12 @@
       color: #28a745;
       font-weight: bold;
     }
-    /* 기대 수익 결과 영역 - 페이지 최상단에 위치 */
-    #total-profit {
-      padding: 15px;
-      background-color: #f0f8ff;
-      border-radius: 6px;
-      margin-bottom: 20px;
+    .profit-summary {
       font-size: 20px;
+      margin-top: 10px;
+      padding: 15px;
+      background-color: #e9f5ff;
+      border-radius: 6px;
       font-weight: bold;
     }
     .profit-positive {
@@ -128,14 +126,6 @@
     }
     .profit-negative {
       color: #dc3545;
-      font-weight: bold;
-    }
-    .profit-summary {
-      font-size: 20px;
-      margin-top: 10px;
-      padding: 15px;
-      background-color: #e9f5ff;
-      border-radius: 6px;
       font-weight: bold;
     }
     .api-notice {
@@ -233,16 +223,20 @@
 </head>
 <body>
   <div class="container">
-    <!-- 페이지 최상단에 기대 수익 결과 표시 -->
-    <div id="total-profit">
-      시세를 갱신하여 기대 수익을 계산해보세요.
-    </div>
-
     <header>
       <h1>던전앤파이터 요괴 섬멸 수익 계산기</h1>
       <p>실제 200회 데이터 기반 요괴 섬멸 컨텐츠의 기대 수익 계산</p>
     </header>
 
+    <!-- 1. 기대 수익 계산 결과 카드 (최상단에 배치) -->
+    <div class="card" id="resultCard">
+      <h2>기대 수익 계산 결과</h2>
+      <div class="result-container" id="resultContainer">
+        <p>시세를 갱신하여 기대 수익을 계산해보세요.</p>
+      </div>
+    </div>
+
+    <!-- 2. 아이템 경매장 시세 카드 -->
     <div class="card">
       <h2>아이템 경매장 시세</h2>
       <div id="marketPrices">
@@ -262,6 +256,7 @@
       <div id="debugInfo" class="debug-info hidden"></div>
     </div>
 
+    <!-- 3. 요괴 섬멸 평균 보상 (1회당) 카드 -->
     <div class="card">
       <h2>요괴 섬멸 평균 보상 (1회당)</h2>
       <div class="reward-list" id="rewardList">
@@ -271,13 +266,6 @@
         <!-- 총 기대가치가 여기에 표시됩니다 -->
       </div>
       <p class="data-source">* 200회 실행 데이터 기반 평균 계산</p>
-    </div>
-
-    <div class="card" id="resultCard">
-      <h2>기대 수익 계산 결과</h2>
-      <div class="result-container" id="resultContainer">
-        <p>시세를 갱신하여 기대 수익을 계산해보세요.</p>
-      </div>
     </div>
 
     <p class="api-notice">* 경매장 API를 통해 실시간 가격 정보를 제공합니다.</p>
@@ -296,7 +284,6 @@
     const loadingContainer = document.getElementById('loadingContainer');
     const rewardListEl = document.getElementById('rewardList');
     const resultContainer = document.getElementById('resultContainer');
-    const totalProfitEl = document.getElementById('total-profit');
     const apiErrorEl = document.getElementById('apiError');
     const debugInfoEl = document.getElementById('debugInfo');
     const totalValueDisplayEl = document.getElementById('totalValueDisplay');
@@ -311,9 +298,7 @@
       { id: 'gold', name: '골드', avgQuantity: 207360.795, price: 1, fixedPrice: true, tradable: true }
     ];
     
-    // 페이지 로드 시 실행
     document.addEventListener('DOMContentLoaded', function() {
-      // 초기 UI 설정
       initializeUI();
       
       const USE_TEST_DATA = false;
@@ -337,13 +322,11 @@
       }
     });
 
-    // UI 초기화
     function initializeUI() {
       updateMarketPricesUI();
       displayRewardInfo();
     }
 
-    // 테스트 데이터 로드
     function loadTestData() {
       refreshBtn.disabled = true;
       loadingContainer.classList.remove('hidden');
@@ -379,7 +362,6 @@
       }, 500);
     }
 
-    // 모든 아이템 가격 가져오기
     function fetchAllPrices() {
       refreshBtn.disabled = true;
       loadingContainer.classList.remove('hidden');
@@ -475,7 +457,6 @@
         });
     }
 
-    // 모든 아이템의 상태 업데이트
     function updateItemStatus(status) {
       yokaiRewards.forEach(reward => {
         if (reward.tradable && !reward.fixedPrice) {
@@ -484,7 +465,6 @@
       });
     }
 
-    // 시장 가격 UI 업데이트
     function updateMarketPricesUI() {
       marketPricesEl.innerHTML = '';
       
@@ -522,7 +502,6 @@
       });
     }
 
-    // 보상 정보 표시
     function displayRewardInfo() {
       rewardListEl.innerHTML = '';
       
@@ -558,7 +537,6 @@
       totalValueDisplayEl.innerHTML = `총 기대가치 <span class="untradable-value">(${formatNumber(Math.floor(untradableValue))})</span> <span class="total-sum-value">${formatNumber(Math.floor(totalValue))}</span> 골드`;
     }
 
-    // 기대 수익 계산 (NPC 구매는 재귀적 효과 반영)
     function calculateExpectedProfit() {
       let totalExpectedValue = 0;
       let tradableValue = 0;
@@ -587,20 +565,15 @@
       const marketNetProfit = tradableValue - clueMarketPrice;
       
       // NPC 구매의 경우, 재귀적 효과를 고려:
-      // 기존 tradableValue에는 '형상화된 요기의 단서' 항목도 포함되므로, NPC 선택에서는 그 부분을 제거하고,
-      // 대신 재귀적으로 npc 구매 시 기대 수익을 더하는 형태로 계산.
+      // tradableValue에서 단서의 경매 기여분 제거 후 재귀 효과 적용
       let npcNetProfit = 0;
       if (clueItem) {
         const clueAvg = clueItem.avgQuantity;
-        // tradableValue에서 단서의 경매상 항목 기여분 제거
         const tradableWithoutClue = tradableValue - (clueAvg * clueItem.price);
-        // 재귀 공식: Profit_NPC = (tradableWithoutClue - clueNpcPrice + (clueAvg * Profit_NPC))
-        // → (1 - clueAvg)*Profit_NPC = tradableWithoutClue - clueNpcPrice
         npcNetProfit = (tradableWithoutClue - clueNpcPrice) / (1 - clueAvg);
         npcNetProfit = Math.floor(npcNetProfit);
       }
       
-      // 결과 출력 (두 방식을 모두 표시)
       const resultHTML = `
         <p>형상화된 요기의 단서 경매장 구매 비용: <b>${formatNumber(clueMarketPrice)} 골드</b></p>
         <p>형상화된 요기의 단서 NPC 구매 비용 (고정): <b>${formatNumber(clueNpcPrice)} 골드</b></p>
@@ -612,10 +585,8 @@
       `;
       
       resultContainer.innerHTML = resultHTML;
-      totalProfitEl.innerHTML = resultHTML;
     }
 
-    // 숫자 포맷팅
     function formatNumber(num) {
       return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     }
