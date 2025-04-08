@@ -155,13 +155,13 @@
     const debugInfoEl = document.getElementById('debugInfo');
     
     // 요괴 섬멸 보상 데이터 (200회 실행 결과 기반)
-    // 테스트 데이터가 아래와 같이 출력되도록 수정
+    // 경매장 가격은 보통 330,000 골드로, NPC 가격은 90,000 골드로 적용
     const yokaiRewards = [
       { id: 'remnant', name: '요기의 잔흔', avgQuantity: 25.97, price: 5000, fixedPrice: true, tradable: false },
       { id: 'remnant-tradable', name: '요기의 잔흔(1회 교환 가능)', avgQuantity: 3.13, price: 9251, searchName: '요기의 잔흔(1회 교환 가능)', tradable: true },
       { id: 'lion-core', name: '무결점 라이언 코어', avgQuantity: 20.68, price: 275, searchName: '무결점 라이언 코어', tradable: true },
       { id: 'harmony', name: '무결점 조화의 결정체', avgQuantity: 9.44, price: 1560, searchName: '무결점 조화의 결정체', tradable: true },
-      { id: 'clue', name: '형상화된 요기의 단서', avgQuantity: 0.135, price: 345799, searchName: '형상화된 요기의 단서', tradable: true, npcPrice: 90000 },
+      { id: 'clue', name: '형상화된 요기의 단서', avgQuantity: 0.135, price: 330000, searchName: '형상화된 요기의 단서', tradable: true, npcPrice: 90000 },
       { id: 'gold', name: '골드', avgQuantity: 207360, price: 1, fixedPrice: true, tradable: true }
     ];
     
@@ -203,7 +203,7 @@
       apiErrorEl.textContent = '';
       
       setTimeout(() => {
-        // 테스트 데이터 설정 (이미 yokaiRewards에 기본 값이 설정되어 있음)
+        // 테스트 데이터 설정 (yokaiRewards에 이미 값이 설정되어 있음)
         updateMarketPricesUI();
         displayRewardInfo();
         calculateExpectedProfit();
@@ -213,7 +213,7 @@
       }, 500);
     }
     
-    // 실제 API를 호출할 경우 사용하는 함수 (필요시 수정)
+    // 실제 API 호출 (필요시 수정)
     function fetchAllPrices() {
       refreshBtn.disabled = true;
       loadingContainer.style.display = 'inline-block';
@@ -289,7 +289,6 @@
     function updateMarketPricesUI() {
       marketPricesEl.innerHTML = '';
       
-      // 시세 정보는 tradable이며 고정가격이 아닌 항목만 표시
       yokaiRewards.forEach(reward => {
         if (reward.tradable && !reward.fixedPrice) {
           let priceText = reward.status === 'success'
@@ -298,7 +297,6 @@
           if(reward.id === 'clue' && reward.npcPrice) {
             priceText += ` (NPC: ${formatNumber(reward.npcPrice)} 골드)`;
           }
-          // 각 항목을 <p>로 표시
           const p = document.createElement('p');
           p.className = 'price-line';
           p.textContent = `${reward.name}: ${priceText}`;
@@ -313,15 +311,13 @@
       let totalValue = 0;
       let untradableValue = 0;
       
-      // 각 보상 항목 출력
       yokaiRewards.forEach(reward => {
-        // 각 항목의 총 가치는 평균 수량과 단가를 곱함
         const rewardValue = Math.floor(reward.avgQuantity * reward.price);
         totalValue += rewardValue;
         if (!reward.tradable) {
           untradableValue += rewardValue;
         }
-        // 소수점은 보이는 평균값으로 맞춤 (clue는 0.14로 표시)
+        // clue의 평균은 0.135가 0.14로 표시되도록 보정
         const avgDisplay = reward.id === 'clue' ? (reward.avgQuantity + 0.005).toFixed(2) : reward.avgQuantity.toFixed(2);
         const p = document.createElement('p');
         p.className = 'reward-line';
@@ -329,14 +325,13 @@
         rewardListEl.appendChild(p);
       });
       
-      // 총 기대가치 (전체값과 untradable 값을 괄호 안에 표시)
       const pTotal = document.createElement('p');
       pTotal.className = 'reward-total';
       pTotal.innerHTML = `총 기대가치 (${formatNumber(untradableValue)}) ${formatNumber(totalValue)} 골드`;
       rewardListEl.appendChild(pTotal);
     }
     
-    // 기대 수익 계산 (경매장 구매 vs. NPC 구매: 재귀 효과 반영)
+    // 기대 수익 계산 (경매장 구매에도 재귀 효과 적용)
     function calculateExpectedProfit() {
       let tradableValue = 0;
       yokaiRewards.forEach(reward => {
@@ -350,24 +345,25 @@
       const clueMarketPrice = clueItem ? clueItem.price : 0;
       const clueNpcPrice = clueItem && clueItem.npcPrice ? clueItem.npcPrice : 0;
       
-      // 경매장 구매의 경우 단순 차감
-      const marketNetProfit = tradableValue - clueMarketPrice;
-      
-      // NPC 구매의 경우, 재귀 효과 고려
-      let npcNetProfit = 0;
+      // 재귀 효과를 경매장 구매에도 적용하는 공식 (예시)
+      let auctionNetProfit = 0, npcNetProfit = 0;
       if (clueItem) {
         const clueAvg = clueItem.avgQuantity; // 0.135
-        const tradableWithoutClue = tradableValue - (clueAvg * clueItem.price);
-        npcNetProfit = (tradableWithoutClue - clueNpcPrice) / (1 - clueAvg);
+        // 경매장 구매 시에도 재귀 효과 적용: 
+        // (전체 거래액 - 단서 가격 + 단서 평균 획득량×기대 수익) 형태로 계산
+        auctionNetProfit = (tradableValue - clueMarketPrice) / (1 - clueAvg);
+        auctionNetProfit = Math.floor(auctionNetProfit);
+        
+        // NPC 구매 시 계산 (단, NPC 가격은 고정 90,000)
+        npcNetProfit = (tradableValue - clueNpcPrice) / (1 - clueAvg);
         npcNetProfit = Math.floor(npcNetProfit);
       }
       
-      // 결과를 위의 샘플 형식에 맞게 출력
       const resultHTML = `
         <p class="result-line">형상화된 요기의 단서 경매장 구매 비용: <b>${formatNumber(clueMarketPrice)} 골드</b></p>
         <p class="result-line">형상화된 요기의 단서 NPC 구매 비용 (고정): <b>${formatNumber(clueNpcPrice)} 골드</b></p>
         <p class="result-line">요괴 섬멸 컨텐츠 평균 획득량: <b>${formatNumber(clueItem ? (clueItem.avgQuantity + 0.005) : 0)} 개</b></p>
-        <p class="result-line">경매장 구매 시 기대 수익: <b class="${marketNetProfit >= 0 ? 'profit-positive' : 'profit-negative'}">${formatNumber(marketNetProfit)} 골드</b></p>
+        <p class="result-line">경매장 구매 시 기대 수익: <b class="${auctionNetProfit >= 0 ? 'profit-positive' : 'profit-negative'}">${formatNumber(auctionNetProfit)} 골드</b></p>
         <p class="result-line">NPC(재귀 효과 적용) 구매 시 기대 수익: <b class="${npcNetProfit >= 0 ? 'profit-positive' : 'profit-negative'}">${formatNumber(npcNetProfit)} 골드</b></p>
       `;
       resultContainer.innerHTML = resultHTML;
