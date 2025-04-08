@@ -163,6 +163,31 @@
       border-radius: 4px;
       display: none;
     }
+    .market-price {
+      font-weight: bold;
+      margin-left: 5px;
+      color: var(--primary);
+    }
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+    .status-success {
+      background-color: #28a745;
+    }
+    .status-error {
+      background-color: #dc3545;
+    }
+    .status-loading {
+      background-color: #ffc107;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink {
+      50% { opacity: 0.5; }
+    }
   </style>
 </head>
 <body>
@@ -173,13 +198,15 @@
     </header>
 
     <div class="card">
-      <h2>형성화된 요기의 단서 가격</h2>
-      <div class="item-price">
-        <div>
-          <span>현재 경매장 가격:</span>
-          <span class="price-text" id="cluePrice">로딩 중...</span>
+      <h2>아이템 경매장 시세</h2>
+      <div id="marketPrices">
+        <!-- 가격 정보가 여기에 표시됩니다 -->
+        <div class="item-price">
+          <div>가격 정보를 불러오는 중입니다...</div>
         </div>
-        <button id="refreshBtn">가격 갱신</button>
+      </div>
+      <div class="item-price">
+        <button id="refreshBtn">시세 갱신</button>
       </div>
       <div id="loadingContainer" class="hidden">
         <span>경매장 정보를 불러오는 중</span>
@@ -199,7 +226,7 @@
     <div class="card" id="resultCard">
       <h2>기대 수익 계산 결과</h2>
       <div class="result-container" id="resultContainer">
-        <p>가격을 갱신하여 기대 수익을 계산해보세요.</p>
+        <p>시세를 갱신하여 기대 수익을 계산해보세요.</p>
       </div>
     </div>
 
@@ -211,7 +238,7 @@
     const API_KEY = 'dA1z1Asq6LFor0nqdlI971tBmBXuZc8E';
     
     // DOM 요소
-    const cluePriceEl = document.getElementById('cluePrice');
+    const marketPricesEl = document.getElementById('marketPrices');
     const refreshBtn = document.getElementById('refreshBtn');
     const loadingContainer = document.getElementById('loadingContainer');
     const rewardListEl = document.getElementById('rewardList');
@@ -220,32 +247,81 @@
     
     // 요괴 섬멸 보상 데이터 (200회 실행 결과 기반)
     const yokaiRewards = [
-      { id: 'rewards-remnant', name: '요기의 잔흔', avgQuantity: 25.97, price: 5000, fixedPrice: true },
-      { id: 'rewards-remnant-tradable', name: '요기의 잔흔(1회 거래 가능)', avgQuantity: 3.125, price: 0 },
-      { id: 'rewards-lion-core', name: '무결점 라이언 코어', avgQuantity: 20.68, price: 0 },
-      { id: 'rewards-harmony', name: '무결점 조화의 결정체', avgQuantity: 9.435, price: 0 },
-      { id: 'rewards-clue', name: '형상화된 요기의 단서', avgQuantity: 0.135, price: 90000, fixedPrice: true },
-      { id: 'rewards-gold', name: '골드', avgQuantity: 207360.795, price: 1, fixedPrice: true }
+      { id: 'remnant', name: '요기의 잔흔', avgQuantity: 25.97, price: 5000, fixedPrice: true },
+      { id: 'remnant-tradable', name: '요기의 잔흔(1회 거래 가능)', avgQuantity: 3.125, price: 0, searchName: '요기의 잔흔' },
+      { id: 'lion-core', name: '무결점 라이언 코어', avgQuantity: 20.68, price: 0, searchName: '무결점 라이언 코어' },
+      { id: 'harmony', name: '무결점 조화의 결정체', avgQuantity: 9.435, price: 0, searchName: '무결점 조화의 결정체' },
+      { id: 'clue', name: '형상화된 요기의 단서', avgQuantity: 0.135, price: 0, searchName: '형상화된 요기의 단서' },
+      { id: 'gold', name: '골드', avgQuantity: 207360.795, price: 1, fixedPrice: true }
     ];
-
-    // 아이템 ID 매핑 (실제 API에 맞게 수정 필요)
-    const itemIds = {
-      'rewards-remnant-tradable': 'f9941d3fa0b8253bb0b2567a29b1299f',
-      'rewards-lion-core': '01a0ba48b5af060379a11fe43cc2b517',
-      'rewards-harmony': 1f575027600618cabf8a3516601dfd29'
-    };
     
     // 페이지 로드 시 실행
     document.addEventListener('DOMContentLoaded', function() {
-      // 보상 정보 표시
-      displayRewardInfo();
+      // 초기 UI 설정
+      initializeUI();
       
-      // 초기 가격 로드
-      fetchAllPrices();
+      // 테스트 모드인 경우 테스트 데이터 사용
+      const USE_TEST_DATA = false;
+      
+      if (USE_TEST_DATA) {
+        loadTestData();
+      } else {
+        // 실제 API 호출
+        fetchAllPrices();
+      }
       
       // 가격 갱신 버튼 이벤트
-      refreshBtn.addEventListener('click', fetchAllPrices);
+      refreshBtn.addEventListener('click', function() {
+        if (USE_TEST_DATA) {
+          loadTestData();
+        } else {
+          fetchAllPrices();
+        }
+      });
     });
+
+    // UI 초기화
+    function initializeUI() {
+      // 시장 가격 UI 초기화
+      updateMarketPricesUI();
+      
+      // 보상 정보 표시
+      displayRewardInfo();
+    }
+
+    // 테스트 데이터 로드
+    function loadTestData() {
+      refreshBtn.disabled = true;
+      loadingContainer.classList.remove('hidden');
+      apiErrorEl.style.display = 'none';
+      
+      setTimeout(() => {
+        // 테스트 가격 설정
+        yokaiRewards.forEach(reward => {
+          if (reward.id === 'remnant-tradable') {
+            reward.price = 10500;
+            reward.avgPrice = 10500;
+          } else if (reward.id === 'lion-core') {
+            reward.price = 22000;
+            reward.avgPrice = 22000;
+          } else if (reward.id === 'harmony') {
+            reward.price = 32000;
+            reward.avgPrice = 32000;
+          } else if (reward.id === 'clue') {
+            reward.price = 550000;
+            reward.avgPrice = 550000;
+          }
+        });
+        
+        // UI 업데이트
+        updateMarketPricesUI();
+        displayRewardInfo();
+        calculateExpectedProfit();
+        
+        refreshBtn.disabled = false;
+        loadingContainer.classList.add('hidden');
+      }, 500);
+    }
 
     // 모든 아이템 가격 가져오기
     function fetchAllPrices() {
@@ -254,73 +330,53 @@
       loadingContainer.classList.remove('hidden');
       apiErrorEl.style.display = 'none';
       
-      // 실제 API 연동 코드 (데모를 위해 주석을 해제하고 테스트 데이터를 사용)
-      const fetchPromises = yokaiRewards
-        .filter(reward => !reward.fixedPrice)
-        .map(reward => {
-          const itemId = itemIds[reward.id];
-          if (!itemId) return Promise.resolve();
-          
-          // 실제 API URL로 대체 필요
-          const apiUrl = `https://api.neople.co.kr/df/auction/<auctionNo>?apikey=dA1z1Asq6LFor0nqdlI971tBmBXuZc8E';
-          
-          // 아래는 테스트용 코드입니다. 실제 API 연동 시 이 부분을 주석 처리하고 위의 fetch 코드를 사용하세요.
-          /*
-          return new Promise((resolve) => {
-            setTimeout(() => {
-              // 테스트 가격 설정
-              switch(reward.name) {
-                case '요기의 잔흔(1회 거래 가능)':
-                  reward.price = Math.floor(Math.random() * (12000 - 9000) + 9000);
-                  break;
-                case '무결점 라이언 코어':
-                  reward.price = Math.floor(Math.random() * (25000 - 20000) + 20000);
-                  break;
-                case '무결점 조화의 결정체':
-                  reward.price = Math.floor(Math.random() * (35000 - 30000) + 30000);
-                  break;
-                case '형상화된 요기의 단서':
-                  reward.price = Math.floor(Math.random() * (600000 - 500000) + 500000);
-                  break;
-                case '레어 아티펙트':
-                  reward.price = Math.floor(Math.random() * (1500000 - 1000000) + 1000000);
-                  break;
-                default:
-                  reward.price = 0;
-              }
-              resolve();
-            }, 300);
-          */
-          });
-          
-          // 실제 API 연동 시 아래 코드를 사용하세요
-          return fetch(apiUrl)
-            .then(response => {
-              if (!response.ok) {
-                throw new Error(`API 응답 오류: ${response.status}`);
-              }
-              return response.json();
-            })
-            .then(data => {
-              reward.price = data.price;
-            })
-            .catch(error => {
-              console.error(`${reward.name} 가격 로드 오류:`, error);
-              throw error;
-            });
-        });
+      // 상태 표시 업데이트
+      updateItemStatus('loading');
       
-      Promise.all(fetchPromises)
+      // API 호출이 필요한 아이템만 필터링
+      const itemsToFetch = yokaiRewards.filter(reward => !reward.fixedPrice && reward.searchName);
+      
+      // 각 아이템에 대한 API 호출 생성
+      const fetchPromises = itemsToFetch.map(reward => {
+        const itemName = encodeURIComponent(reward.searchName);
+        const apiUrl = `https://api.neople.co.kr/df/auction-sold?itemName=${itemName}&wordType=match&wordShort=true&limit=10&apikey=${API_KEY}`;
+        
+        return fetch(apiUrl)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`API 응답 오류: ${response.status}`);
+            }
+            return response.json();
+          })
+          .then(data => {
+            // API 응답 데이터 처리
+            if (data && data.rows && data.rows.length > 0) {
+              // 최근 거래 가격의 평균 계산
+              const prices = data.rows.map(item => item.unitPrice);
+              const avgPrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+              
+              reward.price = Math.floor(avgPrice);
+              reward.avgPrice = Math.floor(avgPrice);
+              reward.lastUpdate = new Date();
+              reward.status = 'success';
+            } else {
+              throw new Error('데이터를 찾을 수 없습니다');
+            }
+          })
+          .catch(error => {
+            console.error(`${reward.name} 가격 로드 오류:`, error);
+            reward.status = 'error';
+            reward.errorMessage = error.message;
+          });
+      });
+      
+      // 모든 API 호출 완료 후 처리
+      Promise.allSettled(fetchPromises)
         .then(() => {
-          // 단서 가격 업데이트
-          const clueItem = yokaiRewards.find(item => item.name === '형상화된 요기의 단서');
-          if (clueItem) {
-            updateCluePrice(clueItem.price);
-          }
-          
-          // 보상 정보 및 수익 계산 업데이트
+          // UI 업데이트
+          updateMarketPricesUI();
           displayRewardInfo();
-          calculateExpectedProfit(clueItem ? clueItem.price : 0);
+          calculateExpectedProfit();
         })
         .catch(error => {
           console.error('API 오류:', error);
@@ -333,9 +389,45 @@
         });
     }
 
-    // 단서 가격 업데이트
-    function updateCluePrice(price) {
-      cluePriceEl.textContent = formatNumber(Math.floor(price)) + ' 골드';
+    // 모든 아이템의 상태 업데이트
+    function updateItemStatus(status) {
+      yokaiRewards.forEach(reward => {
+        if (!reward.fixedPrice) {
+          reward.status = status;
+        }
+      });
+    }
+
+    // 시장 가격 UI 업데이트
+    function updateMarketPricesUI() {
+      marketPricesEl.innerHTML = '';
+      
+      yokaiRewards.forEach(reward => {
+        if (!reward.fixedPrice) {
+          const statusClass = reward.status === 'success' ? 'status-success' : 
+                            reward.status === 'error' ? 'status-error' : 'status-loading';
+          
+          const itemEl = document.createElement('div');
+          itemEl.className = 'item-price';
+          
+          let priceText = '로딩 중...';
+          if (reward.status === 'success') {
+            priceText = `${formatNumber(reward.price)} 골드`;
+          } else if (reward.status === 'error') {
+            priceText = '가격 정보 없음';
+          }
+          
+          itemEl.innerHTML = `
+            <div>
+              <span class="status-indicator ${statusClass}"></span>
+              <span>${reward.name}:</span>
+              <span class="market-price">${priceText}</span>
+            </div>
+          `;
+          
+          marketPricesEl.appendChild(itemEl);
+        }
+      });
     }
 
     // 보상 정보 표시
@@ -373,7 +465,7 @@
     }
 
     // 기대 수익 계산
-    function calculateExpectedProfit(cluePrice) {
+    function calculateExpectedProfit() {
       // 총 기대 가치 계산
       let totalExpectedValue = 0;
       yokaiRewards.forEach(reward => {
@@ -382,15 +474,18 @@
       
       // 소수점 제거
       totalExpectedValue = Math.floor(totalExpectedValue);
-      cluePrice = Math.floor(cluePrice);
+      
+      // 형상화된 요기의 단서 가격 가져오기
+      const clueItem = yokaiRewards.find(item => item.id === 'clue');
+      const cluePrice = clueItem ? clueItem.price : 0;
       
       // 순이익 계산
       const netProfit = totalExpectedValue - cluePrice;
-      const profitRatio = (netProfit / cluePrice) * 100;
+      const profitRatio = cluePrice > 0 ? (netProfit / cluePrice) * 100 : 0;
       
       // 결과 표시
       resultContainer.innerHTML = `
-        <p>형성화된 요기의 단서 비용: <b>${formatNumber(cluePrice)} 골드</b></p>
+        <p>형상화된 요기의 단서 비용: <b>${formatNumber(cluePrice)} 골드</b></p>
         <p>요괴 섬멸 기대 수익: <b>${formatNumber(totalExpectedValue)} 골드</b></p>
         <p>예상 순이익: <span class="${netProfit >= 0 ? 'profit-positive' : 'profit-negative'}">${formatNumber(netProfit)} 골드</span></p>
         
