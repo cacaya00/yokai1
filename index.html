@@ -229,7 +229,7 @@
       
       const fetchPromises = itemsToFetch.map(reward => {
         const itemName = encodeURIComponent(reward.searchName);
-        const corsProxy = 'https://cors-anywhere.herokuapp.com/';
+        const corsProxy = 'https://proxydnf.netlify.app/';
         const apiUrl = `${corsProxy}https://api.neople.co.kr/df/auction-sold?itemName=${itemName}&wordType=match&wordShort=true&limit=10&apikey=${API_KEY}`;
         
         if (DEBUG_MODE) {
