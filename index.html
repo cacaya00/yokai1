@@ -358,108 +358,121 @@
       }, 500);
     }
 
-    // 모든 아이템 가격 가져오기
-    function fetchAllPrices() {
-      // 버튼 및 로딩 상태 표시
-      refreshBtn.disabled = true;
-      loadingContainer.classList.remove('hidden');
-      apiErrorEl.style.display = 'none';
-      
-      // 상태 표시 업데이트
-      updateItemStatus('loading');
-      
-      // API 호출이 필요한 아이템만 필터링 (거래 가능하고 검색 이름이 있는 아이템)
-      const itemsToFetch = yokaiRewards.filter(reward => reward.tradable && !reward.fixedPrice && reward.searchName);
-      
-      // 디버그 정보
+  // 모든 아이템 가격 가져오기
+  function fetchAllPrices() {
+    // 버튼 및 로딩 상태 표시
+    refreshBtn.disabled = true;
+    loadingContainer.classList.remove('hidden');
+    apiErrorEl.style.display = 'none';
+  
+    // 상태 표시 업데이트
+    updateItemStatus('loading');
+  
+    // API 호출이 필요한 아이템만 필터링 (거래 가능하고 검색 이름이 있는 아이템)
+    const itemsToFetch = yokaiRewards.filter(reward => reward.tradable && !reward.fixedPrice && reward.searchName);
+  
+    // 디버그 정보
+    if (DEBUG_MODE) {
+      debugInfoEl.innerHTML = `검색할 아이템: ${itemsToFetch.map(item => item.name).join(', ')}`;
+    }
+  
+    // 각 아이템에 대한 API 호출 생성
+    const fetchPromises = itemsToFetch.map(reward => {
+      const itemName = encodeURIComponent(reward.searchName);
+      // CORS 프록시 URL 추가
+      const corsProxy = 'https://cors-anywhere.herokuapp.com/';
+      const apiUrl = `${corsProxy}https://api.neople.co.kr/df/auction-sold?itemName=${itemName}&wordType=match&wordShort=true&limit=10&apikey=${API_KEY}`;
+    
+      // 디버그 정보 추가
       if (DEBUG_MODE) {
-        debugInfoEl.innerHTML = `검색할 아이템: ${itemsToFetch.map(item => item.name).join(', ')}`;
+        console.log(`${reward.name} 검색 URL: ${apiUrl}`);
+        debugInfoEl.innerHTML += `<br>${reward.name} API 호출 중...`;
       }
-      
-      // 각 아이템에 대한 API 호출 생성
-      const fetchPromises = itemsToFetch.map(reward => {
-        const itemName = encodeURIComponent(reward.searchName);
-        const corsProxy = 'https://cors-anywhere.herokuapp.com/';
-        const apiUrl = `https://api.neople.co.kr/df/auction-sold?itemName=${itemName}&wordType=match&wordShort=true&limit=10&apikey=${API_KEY}`;
-        
-        // 디버그 정보 추가
-        if (DEBUG_MODE) {
-          console.log(`${reward.name} 검색 URL: ${apiUrl}`);
-        }
-        
-        return fetch(apiUrl)
-          .then(response => {
-            if (!response.ok) {
-              throw new Error(`API 응답 오류: ${response.status}`);
-            }
-            return response.json();
-          })
-          .then(data => {
-            // 디버그 정보
-            if (DEBUG_MODE) {
-              console.log(`${reward.name} 응답:`, data);
-            }
-            
-            // API 응답 데이터 처리
-            if (data && data.rows && data.rows.length > 0) {
-              // 최근 거래 가격의 평균 계산
-              const prices = data.rows.map(item => item.unitPrice);
-              const avgPrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
-              
-              reward.price = Math.floor(avgPrice);
-              reward.avgPrice = Math.floor(avgPrice);
-              reward.lastUpdate = new Date();
-              reward.status = 'success';
-              
-              // 디버그 정보
-              if (DEBUG_MODE) {
-                console.log(`${reward.name} 가격 설정: ${reward.price} 골드`);
-              }
-            } else {
-              throw new Error('데이터를 찾을 수 없습니다');
-            }
-          })
-          .catch(error => {
-            console.error(`${reward.name} 가격 로드 오류:`, error);
-            reward.status = 'error';
-            reward.errorMessage = error.message;
-            
-            // 테스트용 데이터 설정 (API 호출 실패 시)
-            if (reward.id === 'remnant-tradable') {
-              reward.price = 10500;
-            } else if (reward.id === 'lion-core') {
-              reward.price = 22000;
-            } else if (reward.id === 'harmony') {
-              reward.price = 32000;
-            } else if (reward.id === 'clue') {
-              reward.price = 550000;
-            }
-          });
-      });
-      
-      // 모든 API 호출 완료 후 처리
-      Promise.allSettled(fetchPromises)
-        .then(results => {
+    
+      return fetch(apiUrl)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`API 응답 오류: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
           // 디버그 정보
           if (DEBUG_MODE) {
-            console.log('모든 API 호출 결과:', results);
+            console.log(`${reward.name} 응답:`, data);
           }
           
-          // UI 업데이트
-          updateMarketPricesUI();
-          displayRewardInfo();
-          calculateExpectedProfit();
+          // API 응답 데이터 처리
+          if (data && data.rows && data.rows.length > 0) {
+            // 최근 거래 가격의 평균 계산
+            const prices = data.rows.map(item => item.unitPrice);
+            const avgPrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+          
+            reward.price = Math.floor(avgPrice);
+            reward.avgPrice = Math.floor(avgPrice);
+            reward.lastUpdate = new Date();
+            reward.status = 'success';
+          
+            // 디버그 정보
+            if (DEBUG_MODE) {
+              console.log(`${reward.name} 가격 설정: ${reward.price} 골드`);
+              debugInfoEl.innerHTML += `<br>${reward.name} 가격: ${reward.price} 골드 (성공)`;
+            }
+          } else {
+            throw new Error('데이터를 찾을 수 없습니다');
+          }
         })
         .catch(error => {
-          console.error('API 오류:', error);
-          apiErrorEl.textContent = '경매장 정보를 가져오는데 실패했습니다. 잠시 후 다시 시도해주세요.';
-          apiErrorEl.style.display = 'block';
-        })
-        .finally(() => {
-          refreshBtn.disabled = false;
-          loadingContainer.classList.add('hidden');
+          console.error(`${reward.name} 가격 로드 오류:`, error);
+          reward.status = 'error';
+          reward.errorMessage = error.message;
+        
+          // 디버그 정보
+          if (DEBUG_MODE) {
+            debugInfoEl.innerHTML += `<br>${reward.name} 오류: ${error.message}`;
+          }
+          
+          // 테스트용 데이터 설정 (API 호출 실패 시)
+          if (reward.id === 'remnant-tradable') {
+            reward.price = 10500;
+          } else if (reward.id === 'lion-core') {
+            reward.price = 22000;
+          } else if (reward.id === 'harmony') {
+            reward.price = 32000;
+          } else if (reward.id === 'clue') {
+            reward.price = 550000;
+          }
         });
-    }
+    });
+  
+    // 모든 API 호출 완료 후 처리
+    Promise.allSettled(fetchPromises)
+      .then(results => {
+        // 디버그 정보
+        if (DEBUG_MODE) {
+          console.log('모든 API 호출 결과:', results);
+          debugInfoEl.innerHTML += '<br>모든 API 호출 완료';
+        }
+      
+        // UI 업데이트
+        updateMarketPricesUI();
+        displayRewardInfo();
+        calculateExpectedProfit();
+      })
+      .catch(error => {
+        console.error('API 오류:', error);
+        apiErrorEl.textContent = '경매장 정보를 가져오는데 실패했습니다. 잠시 후 다시 시도해주세요.';
+        apiErrorEl.style.display = 'block';
+      
+        if (DEBUG_MODE) {
+          debugInfoEl.innerHTML += `<br>전체 API 오류: ${error.message}`;
+        }
+      })
+      .finally(() => {
+        refreshBtn.disabled = false;
+        loadingContainer.classList.add('hidden');
+      });
+  }
 
     // 모든 아이템의 상태 업데이트
     function updateItemStatus(status) {
