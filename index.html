@@ -379,6 +379,7 @@
       // 각 아이템에 대한 API 호출 생성
       const fetchPromises = itemsToFetch.map(reward => {
         const itemName = encodeURIComponent(reward.searchName);
+        const corsProxy = 'https://corsproxy.io/?';
         const apiUrl = `https://api.neople.co.kr/df/auction-sold?itemName=${itemName}&wordType=match&wordShort=true&limit=10&apikey=${API_KEY}`;
         
         // 디버그 정보 추가
